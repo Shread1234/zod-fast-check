@@ -1,20 +1,24 @@
 import fc, { Arbitrary } from "fast-check";
-import { ZodDef, ZodSchema, ZodTypeDef, ZodTypes } from "zod";
-import { ZodArrayDef } from "zod/lib/cjs/types/array";
-import { ZodEnumDef } from "zod/lib/cjs/types/enum";
-import { ZodLiteralDef } from "zod/lib/cjs/types/literal";
-import { ZodMapDef } from "zod/lib/cjs/types/map";
-import { ZodNativeEnumDef } from "zod/lib/cjs/types/nativeEnum";
-import { ZodNullableDef } from "zod/lib/cjs/types/nullable";
-import { ZodObjectDef } from "zod/lib/cjs/types/object";
-import { ZodOptionalDef } from "zod/lib/cjs/types/optional";
-import { ZodRecordDef } from "zod/lib/cjs/types/record";
-import { ZodTupleDef } from "zod/lib/cjs/types/tuple";
-import { ZodUnionDef } from "zod/lib/cjs/types/union";
-import { ZodTransformerDef } from "zod/lib/cjs/types/transformer";
-import { ZodPromiseDef } from "zod/lib/cjs/types/promise";
-import { ZodFunctionDef } from "zod/lib/cjs/types/function";
-import { util as zodUtils } from "zod/lib/cjs/helpers/util";
+import {
+  ZodDef,
+  ZodSchema,
+  ZodTypeDef,
+  ZodTypes,
+  ZodArrayDef,
+  ZodEnumDef,
+  ZodLiteralDef,
+  ZodMapDef,
+  ZodNativeEnumDef,
+  ZodNullableDef,
+  ZodObjectDef,
+  ZodOptionalDef,
+  ZodRecordDef,
+  ZodTupleDef,
+  ZodUnionDef,
+  ZodTransformerDef,
+  ZodPromiseDef,
+  ZodFunctionDef,
+} from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
 
@@ -171,8 +175,8 @@ const arbitraryBuilder: ArbitraryBuilder = {
     return fc.constant(null);
   },
   array(def: ZodArrayDef, recurse: ZodSchemaToArbitrary) {
-    const minLength = def.nonempty ? 1 : 0;
-    const maxLength = 2 * minLength + 10;
+    const minLength = def.minLength?.value ?? 0;
+    const maxLength = Math.min(def.maxLength?.value ?? 10, 10);
     return fc.array(recurse(def.type), minLength, maxLength);
   },
   object(def: ZodObjectDef, recurse: ZodSchemaToArbitrary) {
@@ -214,7 +218,7 @@ const arbitraryBuilder: ArbitraryBuilder = {
     return fc.oneof(...def.values.map(fc.constant));
   },
   nativeEnum(def: ZodNativeEnumDef) {
-    const enumValues = zodUtils.getValidEnumValues(def.values);
+    const enumValues = getValidEnumValues(def.values);
     return fc.oneof(...enumValues.map(fc.constant));
   },
   promise(def: ZodPromiseDef, recurse: ZodSchemaToArbitrary) {
@@ -296,3 +300,20 @@ function objectFromEntries<Value>(
   }
   return object;
 }
+
+export const getValidEnumValues = (obj: any) => {
+  const validKeys = Object.keys(obj).filter(
+    (k: any) => typeof obj[obj[k]] !== "number"
+  );
+  const filtered: any = {};
+  for (const k of validKeys) {
+    filtered[k] = obj[k];
+  }
+  return getValues(filtered);
+};
+
+export const getValues = (obj: any) => {
+  return Object.keys(obj).map(function (e) {
+    return obj[e];
+  });
+};
