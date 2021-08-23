@@ -45,6 +45,8 @@ import {
   ZodOptional,
   ZodNullable,
   ZodNumberDef,
+  ZodEffects,
+  ZodEffectsDef,
 } from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
@@ -87,6 +89,7 @@ const ZOD_TYPES = [
   [ZodVoid, "void"],
   [ZodOptional, "optional"],
   [ZodNullable, "nullable"],
+  [ZodEffects, "effects"],
 ] as const;
 
 class _ZodFastCheck {
@@ -121,19 +124,6 @@ class _ZodFastCheck {
       const builder = findArbitraryBuilder(zodSchema);
       preEffectsArbitrary = builder(def, this.inputOf.bind(this));
     }
-
-    // // Applying the effects quite slow, so we can skip that if
-    // // there are no effects.
-    // if ((def.effects ?? []).length === 0) {
-    //   return preEffectsArbitrary as Arbitrary<any>;
-    // }
-
-    // return preEffectsArbitrary.filter(
-    //   throwIfSuccessRateBelow(
-    //     MIN_SUCCESS_RATE,
-    //     (value): value is typeof value => zodSchema.safeParse(value).success
-    //   )
-    // );
 
     return preEffectsArbitrary;
   }
@@ -222,6 +212,7 @@ function findArbitraryBuilder<Input>(
   throw Error(`Unsupported schema type: ${zodSchema.constructor.name}.`);
 }
 
+// TODO add return type definitions to arbitrary builders.
 const arbitraryBuilders = {
   string() {
     return fc.string();
@@ -340,9 +331,18 @@ const arbitraryBuilders = {
     const nil = null;
     return fc.option(recurse(def.innerType), { nil, freq: 2 });
   },
-  // transformer(def: ZodTransformerDef, recurse: ZodSchemaToArbitrary) {
-  //   return recurse(def.schema);
-  // },
+  effects(def: ZodEffectsDef, recurse: ZodSchemaToArbitrary) {
+    const preEffectsArbitrary = recurse(def.schema);
+
+    const effectsSchema = new ZodEffects(def);
+
+    return preEffectsArbitrary.filter(
+      throwIfSuccessRateBelow(
+        MIN_SUCCESS_RATE,
+        (value): value is typeof value => effectsSchema.safeParse(value).success
+      )
+    );
+  },
 };
 
 export class ZodFastCheckError extends Error {}
