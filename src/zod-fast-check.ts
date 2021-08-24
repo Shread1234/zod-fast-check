@@ -52,6 +52,7 @@ import {
   ZodFirstPartyTypeKind,
   ZodSetDef,
   ZodDefaultDef,
+  ZodStringDef,
 } from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
@@ -180,9 +181,32 @@ function findArbitraryBuilder<Input>(
 }
 
 const newArbitraryBuilders: ArbitraryBuilders = {
-  ZodString() {
-    // TODO string checks.
-    return fc.string();
+  ZodString(def: ZodStringDef) {
+    let minLength = 0;
+    let maxLength: number | null = null;
+
+    for (const check of def.checks) {
+      switch (check.kind) {
+        case "min":
+          minLength = Math.max(minLength, check.value);
+          break;
+        case "max":
+          maxLength = Math.min(maxLength ?? Infinity, check.value);
+          break;
+        case "uuid":
+          return fc.uuid();
+        case "email":
+          return fc.emailAddress();
+        case "url":
+          return fc.webUrl();
+        case "regex":
+          throw "TODO";
+      }
+    }
+
+    if (maxLength === null) maxLength = 2 * minLength + 10;
+
+    return fc.string(minLength, maxLength);
   },
   ZodNumber(def: ZodNumberDef) {
     let min = -(2 ** 64);

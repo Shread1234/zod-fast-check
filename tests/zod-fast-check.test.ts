@@ -82,7 +82,12 @@ describe("Generate arbitaries for Zod schema input types", () => {
     nonpositive: z.number().nonpositive(),
     nonnegative: z.number().nonnegative(),
     "number with custom refinement": z.number().refine((x) => x % 3 === 0),
+
+    "string with minimum length": z.string().min(24),
     "string with maximum length": z.string().max(24),
+    uuid: z.string().uuid(),
+    url: z.string().url(),
+    email: z.string().email(),
 
     "number to string transformer": z.number().transform(String),
     "deeply nested transformer": z.array(z.boolean().transform(Number)),
