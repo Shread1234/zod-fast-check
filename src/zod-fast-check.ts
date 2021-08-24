@@ -15,7 +15,6 @@ import {
   ZodRecordDef,
   ZodTupleDef,
   ZodUnionDef,
-  // ZodTransformerDef,
   ZodPromiseDef,
   ZodFunctionDef,
   ZodString,
@@ -112,39 +111,24 @@ class _ZodFastCheck {
   outputOf<Output, Input>(
     zodSchema: ZodSchema<Output, ZodTypeDef, Input>
   ): Arbitrary<Output> {
-    throw "TODO";
-    // const def: ZodDef = zodSchema._def as ZodDef;
+    let inputArbitrary = this.inputOf(zodSchema);
 
-    // let preEffectsArbitrary: Arbitrary<Input>;
+    // ZodEffects is the only first-party type where the input differs from
+    // the output, so for the others, we can just use the input arbitrary
+    // unchanged.
+    if (isFirstPartyType(zodSchema) && !(zodSchema instanceof ZodEffects)) {
+      return inputArbitrary as Arbitrary<any>;
+    }
 
-    // const override = this.overrides.get(zodSchema);
-
-    // if (override) {
-    //   preEffectsArbitrary = override as Arbitrary<Input>;
-    // } else {
-    //   const builder = arbitraryBuilder[def.t] as (
-    //     def: ZodDef,
-    //     recurse: ZodSchemaToArbitrary
-    //   ) => Arbitrary<Input>;
-
-    //   preEffectsArbitrary = builder(def, this.outputOf.bind(this));
-    // }
-
-    // // Applying the effects is quite slow, so we can skip that if
-    // // there are no effects.
-    // if ((def.effects ?? []).length === 0) {
-    //   return preEffectsArbitrary as Arbitrary<any>;
-    // }
-
-    // return preEffectsArbitrary
-    //   .map((value) => zodSchema.safeParse(value))
-    //   .filter(
-    //     throwIfSuccessRateBelow(
-    //       MIN_SUCCESS_RATE,
-    //       isUnionMember({ success: true })
-    //     )
-    //   )
-    //   .map((parsed) => parsed.data);
+    return inputArbitrary
+      .map((value) => zodSchema.safeParse(value))
+      .filter(
+        throwIfSuccessRateBelow(
+          MIN_SUCCESS_RATE,
+          isUnionMember({ success: true })
+        )
+      )
+      .map((parsed) => parsed.data);
   }
 
   /**
@@ -197,6 +181,7 @@ function findArbitraryBuilder<Input>(
 
 const newArbitraryBuilders: ArbitraryBuilders = {
   ZodString() {
+    // TODO string checks.
     return fc.string();
   },
   ZodNumber(def: ZodNumberDef) {

@@ -212,7 +212,7 @@ describe("Override the arbitrary for a particular schema type", () => {
 
 describe("Throwing an error if it is not able to generate a value", () => {
   test("generating input values for an impossible refinement", () => {
-    const arbitrary = ZodFastCheck().inputOf(z.string().uuid());
+    const arbitrary = ZodFastCheck().inputOf(z.string().refine(() => false));
 
     expect(() =>
       fc.assert(
@@ -224,7 +224,7 @@ describe("Throwing an error if it is not able to generate a value", () => {
   });
 
   test("generating output values for an impossible refinement", () => {
-    const arbitrary = ZodFastCheck().outputOf(z.string().uuid());
+    const arbitrary = ZodFastCheck().outputOf(z.string().refine(() => false));
 
     expect(() =>
       fc.assert(
