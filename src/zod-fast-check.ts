@@ -24,7 +24,6 @@ import {
   ZodDefaultDef,
   ZodStringDef,
   ZodFirstPartySchemaTypes,
-  ZodFirstPartyTypeKind,
 } from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
@@ -32,6 +31,8 @@ const MIN_SUCCESS_RATE = 0.01;
 type ZodSchemaToArbitrary = (
   schema: ZodSchema<unknown, ZodTypeDef, unknown>
 ) => Arbitrary<unknown>;
+
+type ZodFirstPartyTypeKind = ZodFirstPartySchemaTypes["_def"]["typeName"];
 
 type ArbitraryBuilders = {
   [TypeName in ZodFirstPartyTypeKind]: (
@@ -44,20 +45,20 @@ type ExtractFirstPartySchemaType<
   TypeName extends ZodFirstPartyTypeKind
 > = Extract<ZodFirstPartySchemaTypes, { _def: { typeName: TypeName } }>;
 
-const SCALAR_TYPES = new Set<ZodFirstPartyTypeKind>([
-  ZodFirstPartyTypeKind.ZodString,
-  ZodFirstPartyTypeKind.ZodNumber,
-  ZodFirstPartyTypeKind.ZodBigInt,
-  ZodFirstPartyTypeKind.ZodBoolean,
-  ZodFirstPartyTypeKind.ZodDate,
-  ZodFirstPartyTypeKind.ZodUndefined,
-  ZodFirstPartyTypeKind.ZodNull,
-  ZodFirstPartyTypeKind.ZodLiteral,
-  ZodFirstPartyTypeKind.ZodEnum,
-  ZodFirstPartyTypeKind.ZodNativeEnum,
-  ZodFirstPartyTypeKind.ZodAny,
-  ZodFirstPartyTypeKind.ZodUnknown,
-  ZodFirstPartyTypeKind.ZodVoid,
+const SCALAR_TYPES = new Set<`${ZodFirstPartyTypeKind}`>([
+  "ZodString",
+  "ZodNumber",
+  "ZodBigInt",
+  "ZodBoolean",
+  "ZodDate",
+  "ZodUndefined",
+  "ZodNull",
+  "ZodLiteral",
+  "ZodEnum",
+  "ZodNativeEnum",
+  "ZodAny",
+  "ZodUnknown",
+  "ZodVoid",
 ]);
 
 class _ZodFastCheck {
@@ -80,13 +81,23 @@ class _ZodFastCheck {
   inputOf<Input>(
     zodSchema: ZodSchema<unknown, ZodTypeDef, Input>
   ): Arbitrary<Input> {
-    const def = zodSchema._def;
+    let def = zodSchema._def;
 
     const override = this.overrides.get(zodSchema);
 
     if (override) {
       return override as Arbitrary<Input>;
     } else {
+      // This is an appalling hack which is required to support
+      // the ZodNonEmptyArray type in Zod 3.5 and 3.6. The type was
+      // removed in Zod 3.7.
+      if (zodSchema.constructor.name === "ZodNonEmptyArray") {
+        def = {
+          ...def,
+          minLength: (def as ZodArrayDef).minLength ?? { value: 1 },
+        };
+      }
+
       return findArbitraryBuilder(zodSchema)(def, this.inputOf.bind(this));
     }
   }
@@ -104,7 +115,7 @@ class _ZodFastCheck {
     // so we can just use the input arbitrary unchanged.
     if (
       isFirstPartyType(zodSchema) &&
-      SCALAR_TYPES.has(zodSchema._def.typeName)
+      SCALAR_TYPES.has(`${zodSchema._def.typeName}` as const)
     ) {
       return inputArbitrary as Arbitrary<any>;
     }
@@ -151,7 +162,7 @@ function isFirstPartyType(
   const typeName = schema._def.typeName as string | undefined;
   return (
     !!typeName &&
-    Object.prototype.hasOwnProperty.call(ZodFirstPartyTypeKind, typeName)
+    Object.prototype.hasOwnProperty.call(arbitraryBuilders, typeName)
   );
 }
 
@@ -159,7 +170,7 @@ function findArbitraryBuilder<Input>(
   zodSchema: ZodSchema<unknown, ZodTypeDef, Input>
 ): (def: ZodTypeDef, recurse: ZodSchemaToArbitrary) => Arbitrary<Input> {
   if (isFirstPartyType(zodSchema)) {
-    return newArbitraryBuilders[zodSchema._def.typeName] as (
+    return arbitraryBuilders[zodSchema._def.typeName] as (
       def: ZodTypeDef,
       recurse: ZodSchemaToArbitrary
     ) => Arbitrary<any>;
@@ -168,7 +179,7 @@ function findArbitraryBuilder<Input>(
   throw Error(`Unsupported schema type: ${zodSchema.constructor.name}.`);
 }
 
-const newArbitraryBuilders: ArbitraryBuilders = {
+const arbitraryBuilders: ArbitraryBuilders = {
   ZodString(def: ZodStringDef) {
     let minLength = 0;
     let maxLength: number | null = null;
