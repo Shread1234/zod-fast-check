@@ -184,6 +184,7 @@ const newArbitraryBuilders: ArbitraryBuilders = {
   ZodString(def: ZodStringDef) {
     let minLength = 0;
     let maxLength: number | null = null;
+    let hasRegexCheck = false;
 
     for (const check of def.checks) {
       switch (check.kind) {
@@ -200,13 +201,20 @@ const newArbitraryBuilders: ArbitraryBuilders = {
         case "url":
           return fc.webUrl();
         case "regex":
-          throw "TODO";
+          hasRegexCheck = true;
+          break;
       }
     }
 
     if (maxLength === null) maxLength = 2 * minLength + 10;
 
-    return fc.string(minLength, maxLength);
+    const unfiltered = fc.string(minLength, maxLength);
+
+    if (hasRegexCheck) {
+      return filterArbitraryBySchema(unfiltered, new ZodString(def));
+    } else {
+      return unfiltered;
+    }
   },
   ZodNumber(def: ZodNumberDef) {
     let min = -(2 ** 64);
@@ -335,12 +343,7 @@ const newArbitraryBuilders: ArbitraryBuilders = {
 
     const effectsSchema = new ZodEffects(def);
 
-    return preEffectsArbitrary.filter(
-      throwIfSuccessRateBelow(
-        MIN_SUCCESS_RATE,
-        (value): value is typeof value => effectsSchema.safeParse(value).success
-      )
-    );
+    return filterArbitraryBySchema(preEffectsArbitrary, effectsSchema);
   },
 };
 
@@ -358,6 +361,18 @@ const isUnionMember = <T, Filter extends Partial<T>>(filter: Filter) => (
     ([key, expected]) => value[key as keyof T] === expected
   );
 };
+
+function filterArbitraryBySchema<T>(
+  arbitrary: Arbitrary<T>,
+  schema: ZodSchema<any, any, T>
+): Arbitrary<T> {
+  return arbitrary.filter(
+    throwIfSuccessRateBelow(
+      MIN_SUCCESS_RATE,
+      (value): value is typeof value => schema.safeParse(value).success
+    )
+  );
+}
 
 function throwIfSuccessRateBelow<Value, Refined extends Value>(
   rate: number,
