@@ -298,7 +298,7 @@ const newArbitraryBuilders: ArbitraryBuilders = {
     return fc.array(fc.tuple(key, value)).map((entries) => new Map(entries));
   },
   ZodSet(def: ZodSetDef, recurse: ZodSchemaToArbitrary) {
-    throw "TODO";
+    return fc.set(recurse(def.valueType)).map((members) => new Set(members));
   },
   ZodFunction(def: ZodFunctionDef, recurse: ZodSchemaToArbitrary) {
     return recurse(def.returns).map((returnValue) => () => returnValue);
