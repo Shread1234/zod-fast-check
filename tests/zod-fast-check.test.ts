@@ -72,6 +72,7 @@ describe("Generate arbitaries for Zod schema input types", () => {
     "optional boolean": z.optional(z.boolean()),
     "nullable string": z.nullable(z.string()),
     "nullable object": z.nullable(z.object({ age: z.number() })),
+    "with default": z.number().default(0),
 
     // Schemas which rely on refinements
     "number with minimum": z.number().min(500),
@@ -152,6 +153,21 @@ describe("Generate arbitaries for Zod schema output types", () => {
       .int()
       .refine((x) => x < MAX && x > MIN)
       .transform((x) => x * 2);
+
+    const arbitrary = ZodFastCheck().outputOf(schema);
+
+    return fc.assert(
+      fc.property(arbitrary, (value) => {
+        targetSchema.parse(value);
+      })
+    );
+  });
+
+  test("schema with default value", () => {
+    // Unlike the input arbitrary, the output arbitrary should never
+    // produce "undefined" for a schema with a default.
+    const targetSchema = z.string();
+    const schema = z.string().default("hello");
 
     const arbitrary = ZodFastCheck().outputOf(schema);
 

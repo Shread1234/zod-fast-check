@@ -53,6 +53,7 @@ import {
   ZodSetDef,
   ZodDefaultDef,
   ZodStringDef,
+  ZodDefault,
 } from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
@@ -114,10 +115,13 @@ class _ZodFastCheck {
   ): Arbitrary<Output> {
     let inputArbitrary = this.inputOf(zodSchema);
 
-    // ZodEffects is the only first-party type where the input differs from
-    // the output, so for the others, we can just use the input arbitrary
-    // unchanged.
-    if (isFirstPartyType(zodSchema) && !(zodSchema instanceof ZodEffects)) {
+    // For most first-party types, the input is the same as the output,
+    // so we can just use the input arbitrary unchanged.
+    if (
+      isFirstPartyType(zodSchema) &&
+      !(zodSchema instanceof ZodEffects) &&
+      !(zodSchema instanceof ZodDefault)
+    ) {
       return inputArbitrary as Arbitrary<any>;
     }
 
@@ -336,7 +340,7 @@ const newArbitraryBuilders: ArbitraryBuilders = {
     return fc.option(recurse(def.innerType), { nil, freq: 2 });
   },
   ZodDefault(def: ZodDefaultDef, recurse: ZodSchemaToArbitrary) {
-    throw "TODO";
+    return fc.oneof(fc.constant(undefined), recurse(def.innerType));
   },
   ZodEffects(def: ZodEffectsDef, recurse: ZodSchemaToArbitrary) {
     const preEffectsArbitrary = recurse(def.schema);
