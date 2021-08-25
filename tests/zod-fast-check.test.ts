@@ -122,6 +122,19 @@ describe("Generate arbitaries for Zod schema output types", () => {
     );
   });
 
+  test("deeply nested transformer", () => {
+    const targetSchema = z.array(z.number());
+    const schema = z.array(z.boolean().transform(Number));
+
+    const arbitrary = ZodFastCheck().outputOf(schema);
+
+    return fc.assert(
+      fc.asyncProperty(arbitrary, async (value) => {
+        await targetSchema.parse(value);
+      })
+    );
+  });
+
   test("transformer within a transformer", () => {
     // This schema accepts an array of booleans and converts them
     // to strings with exclamation marks then concatenates them.

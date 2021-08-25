@@ -1,9 +1,8 @@
 import fc, { Arbitrary } from "fast-check";
 import {
-  // ZodDef,
   ZodSchema,
+  ZodTypeAny,
   ZodTypeDef,
-  // ZodTypes,
   ZodArrayDef,
   ZodEnumDef,
   ZodLiteralDef,
@@ -18,42 +17,14 @@ import {
   ZodPromiseDef,
   ZodFunctionDef,
   ZodString,
-  ZodNumber,
-  ZodBigInt,
-  ZodBoolean,
-  ZodUndefined,
-  ZodNull,
-  ZodArray,
-  ZodObject,
-  ZodUnion,
-  ZodTuple,
-  ZodRecord,
-  ZodMap,
-  ZodFunction,
-  ZodDate,
-  ZodIntersection,
-  ZodLazy,
-  ZodLiteral,
-  ZodEnum,
-  ZodNativeEnum,
-  ZodPromise,
-  ZodAny,
-  ZodUnknown,
-  ZodNever,
-  ZodVoid,
-  ZodOptional,
-  ZodNullable,
   ZodNumberDef,
   ZodEffects,
   ZodEffectsDef,
-  ZodTypeAny,
-  ZodType,
-  ZodFirstPartySchemaTypes,
-  ZodFirstPartyTypeKind,
   ZodSetDef,
   ZodDefaultDef,
   ZodStringDef,
-  ZodDefault,
+  ZodFirstPartySchemaTypes,
+  ZodFirstPartyTypeKind,
 } from "zod";
 
 const MIN_SUCCESS_RATE = 0.01;
@@ -62,18 +33,32 @@ type ZodSchemaToArbitrary = (
   schema: ZodSchema<unknown, ZodTypeDef, unknown>
 ) => Arbitrary<unknown>;
 
-type ZodFirstPartyTypeName = ZodFirstPartySchemaTypes["_def"]["typeName"];
-
 type ArbitraryBuilders = {
-  [TypeName in ZodFirstPartyTypeName]: (
+  [TypeName in ZodFirstPartyTypeKind]: (
     def: ExtractFirstPartySchemaType<TypeName>["_def"],
     recurse: ZodSchemaToArbitrary
   ) => Arbitrary<ExtractFirstPartySchemaType<TypeName>["_input"]>;
 };
 
 type ExtractFirstPartySchemaType<
-  TypeName extends ZodFirstPartyTypeName
+  TypeName extends ZodFirstPartyTypeKind
 > = Extract<ZodFirstPartySchemaTypes, { _def: { typeName: TypeName } }>;
+
+const SCALAR_TYPES = new Set<ZodFirstPartyTypeKind>([
+  ZodFirstPartyTypeKind.ZodString,
+  ZodFirstPartyTypeKind.ZodNumber,
+  ZodFirstPartyTypeKind.ZodBigInt,
+  ZodFirstPartyTypeKind.ZodBoolean,
+  ZodFirstPartyTypeKind.ZodDate,
+  ZodFirstPartyTypeKind.ZodUndefined,
+  ZodFirstPartyTypeKind.ZodNull,
+  ZodFirstPartyTypeKind.ZodLiteral,
+  ZodFirstPartyTypeKind.ZodEnum,
+  ZodFirstPartyTypeKind.ZodNativeEnum,
+  ZodFirstPartyTypeKind.ZodAny,
+  ZodFirstPartyTypeKind.ZodUnknown,
+  ZodFirstPartyTypeKind.ZodVoid,
+]);
 
 class _ZodFastCheck {
   private overrides = new Map<
@@ -115,12 +100,11 @@ class _ZodFastCheck {
   ): Arbitrary<Output> {
     let inputArbitrary = this.inputOf(zodSchema);
 
-    // For most first-party types, the input is the same as the output,
+    // For scalar types, the input is always the same as the output,
     // so we can just use the input arbitrary unchanged.
     if (
       isFirstPartyType(zodSchema) &&
-      !(zodSchema instanceof ZodEffects) &&
-      !(zodSchema instanceof ZodDefault)
+      SCALAR_TYPES.has(zodSchema._def.typeName)
     ) {
       return inputArbitrary as Arbitrary<any>;
     }
